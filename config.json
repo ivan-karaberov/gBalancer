@@ -1,0 +1,7 @@
+{
+"port" : 8080,
+"backends": [
+  "https://google.com",
+  "https://yandex.ru"
+]
+}
