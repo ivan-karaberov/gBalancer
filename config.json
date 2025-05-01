@@ -3,5 +3,7 @@
 "backends": [
   "https://google.com",
   "https://yandex.ru"
-]
+],
+"capacity" : 100,
+"rate_per_sec": 2
 }
