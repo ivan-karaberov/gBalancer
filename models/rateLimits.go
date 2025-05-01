@@ -16,6 +16,15 @@ func CreateClient(db *gorm.DB, rl *RateLimits) error {
 	return db.Create(&rl).Error
 }
 
+// Updated all client's in the rate_limits table
+func UpdateAllClient(db *gorm.DB, rate int, capacity int) error {
+	updates := RateLimits{
+		Capacity:   capacity,
+		RatePerSec: rate,
+	}
+	return db.Model(&RateLimits{}).Where("1 = 1").Updates(updates).Error
+}
+
 // Updates the client's data in the rate_limits table by their identifier.
 func UpdateClient(db *gorm.DB, rl *RateLimits) error {
 	return db.Model(&RateLimits{}).Where("client_id = ?", rl.ClientID).Updates(rl).Error
