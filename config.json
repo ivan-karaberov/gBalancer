@@ -1,9 +1,9 @@
 {
 "port" : 8080,
 "backends": [
-  "https://google.com",
-  "https://yandex.ru"
+  "http://localhost:3000",
+  "http://localhost:4001"
 ],
-"capacity" : 100,
-"rate_per_sec": 2
+"capacity" : 10,
+"rate_per_sec": 1
 }

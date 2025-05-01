@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gBalancer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    volumes:
+      - ./config.json:/app/config.json
+      - ./.env:/app/.env
+
+  db:
+    container_name: DbBalancer
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db.sql:/docker-entrypoint-initdb.d/db.sql
+
+volumes:
+  db_data:
