@@ -29,7 +29,7 @@ func (bp *BackendPool) LoadBalancer(w http.ResponseWriter, r *http.Request) {
 func AddBackendToPool(serverUrl string, bp *BackendPool) error {
 	parsedUrl, err := url.Parse(serverUrl)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed parse server URL %s: %w", serverUrl, err)
 	}
 
 	proxy, err := createReverseProxy(parsedUrl, bp)
