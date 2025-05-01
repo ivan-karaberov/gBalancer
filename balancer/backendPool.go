@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http/httputil"
 	"net/url"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -16,33 +14,25 @@ const (
 	Retry
 )
 
-// Backend holds the data about a server
-type Backend struct {
-	URL          *url.URL
-	Alive        bool
-	mux          sync.RWMutex
-	ReverseProxy *httputil.ReverseProxy
-}
-
-// Устанавливает статус доступности для бэкенда
-func (b *Backend) SetAlive(alive bool) {
-	b.mux.Lock()
-	defer b.mux.Unlock()
-	b.Alive = alive
-}
-
-// Возвращает статус доступности для бэкенда
-func (b *Backend) IsAlive() (alive bool) {
-	b.mux.RLock()
-	defer b.mux.RUnlock()
-	alive = b.Alive
-	return
-}
-
 // BackendPool содержит информацию о доступных бэкендах
 type BackendPool struct {
-	backends []*Backend
-	current  uint64
+	backends     []*Backend
+	current      uint64
+	loadBalancer LoadBalancer
+}
+
+// Cоздает новый BackendPool на основе массива url
+func NewBackendPool(urls []string, lb LoadBalancer) (*BackendPool, error) {
+	var backendPool BackendPool
+	backendPool.loadBalancer = lb
+
+	for _, serverUrl := range urls {
+		if err := AddBackendToPool(serverUrl, &backendPool); err != nil {
+			return nil, fmt.Errorf("failed to add backend %s: %w", serverUrl, err)
+		}
+	}
+
+	return &backendPool, nil
 }
 
 // Добавляет бэкенд в backend pool
@@ -67,18 +57,7 @@ func (bp *BackendPool) MarkBackendStatus(backendUrl *url.URL, alive bool) {
 
 // возвращает следующий активный peer to take connection
 func (bp *BackendPool) GetNextPeer() *Backend {
-	next := bp.Next()
-	l := len(bp.backends) + next
-	for i := next; i < l; i++ {
-		idx := i % len(bp.backends)
-		if bp.backends[idx].IsAlive() {
-			if i != next {
-				atomic.StoreUint64(&bp.current, uint64(idx))
-			}
-			return bp.backends[idx]
-		}
-	}
-	return nil
+	return bp.loadBalancer.GetNextBackend(bp)
 }
 
 // Проверяет доступность бекенда
@@ -116,17 +95,4 @@ func (bp *BackendPool) HealthCheck() {
 			log.Println("Health check completed")
 		}
 	}
-}
-
-// Cоздает новый BackendPool на основе массива url
-func NewBackendPool(urls []string) (*BackendPool, error) {
-	var backendPool BackendPool
-
-	for _, serverUrl := range urls {
-		if err := AddBackendToPool(serverUrl, &backendPool); err != nil {
-			return nil, fmt.Errorf("failed to add backend %s: %w", serverUrl, err)
-		}
-	}
-
-	return &backendPool, nil
 }

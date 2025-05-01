@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (bp *BackendPool) LoadBalancer(w http.ResponseWriter, r *http.Request) {
+func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
 		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
@@ -55,7 +55,9 @@ func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.Revers
 			select {
 			case <-time.After(10 * time.Millisecond):
 				ctx := context.WithValue(request.Context(), Retry, retries+1)
-				proxy.ServeHTTP(writer, request.WithContext(ctx))
+				if ctx.Err() == nil {
+					proxy.ServeHTTP(writer, request.WithContext(ctx))
+				}
 			}
 			return
 		}
@@ -66,7 +68,7 @@ func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.Revers
 		attempts := GetAttemptsFromContext(request)
 		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
 		ctx := context.WithValue(request.Context(), Attempts, attempts+1)
-		pool.LoadBalancer(writer, request.WithContext(ctx))
+		pool.HandleRequest(writer, request.WithContext(ctx))
 	}
 	return proxy, nil
 }
