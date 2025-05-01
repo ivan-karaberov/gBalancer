@@ -65,7 +65,7 @@ func (bp *BackendPool) healthCheck() {
 		if !alive {
 			status = "down"
 		}
-		logrus.Infof("%s [%s]\n", b.URL, status)
+		logrus.Infof("%s [%s]", b.URL, status)
 	}
 }
 

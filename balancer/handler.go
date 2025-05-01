@@ -28,7 +28,7 @@ var (
 func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
-		logrus.Warningf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
+		logrus.Warningf("%s(%s) Max attempts reached, terminating", r.RemoteAddr, r.URL.Path)
 		http.Error(w, "Service not available", http.StatusServiceUnavailable)
 		return
 
@@ -58,7 +58,7 @@ func AddBackendToPool(serverUrl string, bp *BackendPool) error {
 		Alive:        true,
 		ReverseProxy: proxy,
 	})
-	logrus.Infof("Configured server: %s\n", serverUrl)
+	logrus.Infof("Configured server: %s", serverUrl)
 	return nil
 }
 
@@ -66,7 +66,7 @@ func AddBackendToPool(serverUrl string, bp *BackendPool) error {
 func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.ReverseProxy, error) {
 	proxy := httputil.NewSingleHostReverseProxy(serverUrl)
 	proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
-		logrus.Errorf("[%s] %s\n", serverUrl, e.Error())
+		logrus.Errorf("[%s] %s", serverUrl, e.Error())
 		retries := GetRetryFromContext(request)
 		if retries < 3 {
 			<-time.After(10 * time.Millisecond)
@@ -82,7 +82,7 @@ func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.Revers
 
 		// if the same request routing for few attempts with different backends, increase the count
 		attempts := GetAttemptsFromContext(request)
-		logrus.Warningf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
+		logrus.Warningf("%s(%s) Attempting retry %d", request.RemoteAddr, request.URL.Path, attempts)
 		ctx := context.WithValue(request.Context(), Attempts, attempts+1)
 		pool.HandleRequest(writer, request.WithContext(ctx))
 	}
