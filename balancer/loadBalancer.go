@@ -1,6 +1,10 @@
 package balancer
 
-import "sync/atomic"
+import (
+	"math/rand"
+	"sync/atomic"
+	"time"
+)
 
 type LoadBalancer interface {
 	GetNextBackend(bp *BackendPool) *Backend
@@ -21,4 +25,27 @@ func (rr *RoundRobin) GetNextBackend(bp *BackendPool) *Backend {
 		}
 	}
 	return nil
+}
+
+type Random struct{}
+
+func (r *Random) GetNextBackend(bp *BackendPool) *Backend {
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	aliveBackends := make([]*Backend, 0)
+	for _, backend := range bp.backends {
+		if backend.IsAlive() {
+			aliveBackends = append(aliveBackends, backend)
+		}
+	}
+
+	if len(aliveBackends) == 0 {
+		return nil
+	}
+
+	randomIndex := random.Intn(len(aliveBackends))
+
+	atomic.StoreUint64(&bp.current, uint64(randomIndex))
+
+	return aliveBackends[randomIndex]
 }
