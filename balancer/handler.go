@@ -3,17 +3,32 @@ package balancer
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
+// Определяем пользовательский тип для ключа Retry
+type contextKeyRetry struct{}
+
+// Определяем пользовательский тип для ключа Attempts
+type contextKeyAttempts struct{}
+
+var (
+	Retry    contextKeyRetry    = contextKeyRetry{}
+	Attempts contextKeyAttempts = contextKeyAttempts{}
+)
+
+// HandleRequest processes incoming HTTP requests for the BackendPool.
+// It checks the number of attempts made by the client and routes the request
+// to the next available peer for handling.
 func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
-		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
+		logrus.Warningf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
 		http.Error(w, "Service not available", http.StatusServiceUnavailable)
 		return
 
@@ -26,6 +41,7 @@ func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Service not available", http.StatusServiceUnavailable)
 }
 
+// Adds a new backend server to the specified BackendPool.
 func AddBackendToPool(serverUrl string, bp *BackendPool) error {
 	parsedUrl, err := url.Parse(serverUrl)
 	if err != nil {
@@ -42,22 +58,22 @@ func AddBackendToPool(serverUrl string, bp *BackendPool) error {
 		Alive:        true,
 		ReverseProxy: proxy,
 	})
-	log.Printf("Configured server: %s\n", serverUrl)
+	logrus.Infof("Configured server: %s\n", serverUrl)
 	return nil
 }
 
+// Initializes a new reverse proxy for the specified server URL
 func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.ReverseProxy, error) {
 	proxy := httputil.NewSingleHostReverseProxy(serverUrl)
 	proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
-		log.Printf("[%s] %s\n", serverUrl, e.Error())
+		logrus.Errorf("[%s] %s\n", serverUrl, e.Error())
 		retries := GetRetryFromContext(request)
 		if retries < 3 {
-			select {
-			case <-time.After(10 * time.Millisecond):
-				ctx := context.WithValue(request.Context(), Retry, retries+1)
-				if ctx.Err() == nil {
-					proxy.ServeHTTP(writer, request.WithContext(ctx))
-				}
+			<-time.After(10 * time.Millisecond)
+
+			ctx := context.WithValue(request.Context(), Retry, retries+1)
+			if ctx.Err() == nil {
+				proxy.ServeHTTP(writer, request.WithContext(ctx))
 			}
 			return
 		}
@@ -66,7 +82,7 @@ func createReverseProxy(serverUrl *url.URL, pool *BackendPool) (*httputil.Revers
 
 		// if the same request routing for few attempts with different backends, increase the count
 		attempts := GetAttemptsFromContext(request)
-		log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
+		logrus.Warningf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
 		ctx := context.WithValue(request.Context(), Attempts, attempts+1)
 		pool.HandleRequest(writer, request.WithContext(ctx))
 	}

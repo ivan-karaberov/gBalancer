@@ -2,26 +2,22 @@ package balancer
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 	"sync/atomic"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
-const (
-	Attempts int = iota
-	Retry
-)
-
-// BackendPool содержит информацию о доступных бэкендах
+// BackendPool contains information about available backends
 type BackendPool struct {
 	backends     []*Backend
 	current      uint64
 	loadBalancer LoadBalancer
 }
 
-// Cоздает новый BackendPool на основе массива url
+// Create new BackendPool based on url array
 func NewBackendPool(urls []string, lb LoadBalancer) (*BackendPool, error) {
 	var backendPool BackendPool
 	backendPool.loadBalancer = lb
@@ -35,17 +31,17 @@ func NewBackendPool(urls []string, lb LoadBalancer) (*BackendPool, error) {
 	return &backendPool, nil
 }
 
-// Добавляет бэкенд в backend pool
+// Adds a backend to the backend pool
 func (bp *BackendPool) AddBackend(backend *Backend) {
 	bp.backends = append(bp.backends, backend)
 }
 
-// Атомарно увеличивает счетчик и вовзращает индекс
+// Atomically increments the counter and returns the index
 func (bp *BackendPool) Next() int {
 	return int(atomic.AddUint64(&bp.current, uint64(1)) % uint64(len(bp.backends)))
 }
 
-// Меняет статус доступности бэкенда
+// Changes the availability status of the backend
 func (bp *BackendPool) MarkBackendStatus(backendUrl *url.URL, alive bool) {
 	for _, b := range bp.backends {
 		if b.URL.String() == backendUrl.String() {
@@ -55,12 +51,12 @@ func (bp *BackendPool) MarkBackendStatus(backendUrl *url.URL, alive bool) {
 	}
 }
 
-// возвращает следующий активный peer to take connection
+// Returns the next active peer to take connection
 func (bp *BackendPool) GetNextPeer() *Backend {
 	return bp.loadBalancer.GetNextBackend(bp)
 }
 
-// Проверяет доступность бекенда
+// Checks the availability of the backend
 func (bp *BackendPool) healthCheck() {
 	for _, b := range bp.backends {
 		status := "up"
@@ -69,30 +65,41 @@ func (bp *BackendPool) healthCheck() {
 		if !alive {
 			status = "down"
 		}
-		log.Printf("%s [%s]\n", b.URL, status)
+		logrus.Infof("%s [%s]\n", b.URL, status)
 	}
 }
 
+// isBackendAlive checks if the backend service at the given URL is reachable.
+// It attempts to establish a TCP connection to the host specified in the URL.
+// If the connection is successful within the specified timeout, it returns true.
+// Otherwise, it logs an error and returns false.
 func isBackendAlive(u *url.URL) bool {
 	timeout := 2 * time.Second
 	conn, err := net.DialTimeout("tcp", u.Host, timeout)
 	if err != nil {
-		log.Println("Site unreachable, error: ", err)
+		logrus.Errorf("Site unreachable, error > %s", err)
 		return false
 	}
 	defer conn.Close()
 	return true
 }
 
-// Обертка с задержкой над healthCheck
-func (bp *BackendPool) HealthCheck() {
-	t := time.NewTicker(time.Minute * 2)
+// HealthCheck periodically performs health checks on the backend services.
+// It runs at the specified interval and logs the start and completion of each health check.
+// The function listens for a signal on the stopChan to gracefully terminate the health check process.
+func (bp *BackendPool) HealthCheck(interval time.Duration, stopChan <-chan struct{}) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+
 	for {
 		select {
 		case <-t.C:
-			log.Println("Starting health check...")
+			logrus.Info("Starting health check...")
 			bp.healthCheck()
-			log.Println("Health check completed")
+			logrus.Info("Health check completed")
+		case <-stopChan:
+			logrus.Info("Stopping health check...")
+			return
 		}
 	}
 }

@@ -14,14 +14,14 @@ type Backend struct {
 	ReverseProxy *httputil.ReverseProxy
 }
 
-// Устанавливает статус доступности для бэкенда
+// Sets the availability status for the backend
 func (b *Backend) SetAlive(alive bool) {
 	b.mux.Lock()
 	defer b.mux.Unlock()
 	b.Alive = alive
 }
 
-// Возвращает статус доступности для бэкенда
+// Returns the availability status for the backend
 func (b *Backend) IsAlive() (alive bool) {
 	b.mux.RLock()
 	defer b.mux.RUnlock()
