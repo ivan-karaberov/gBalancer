@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"gBalancer/logger"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -39,7 +40,9 @@ func NewDBConnection() *gorm.DB {
 		os.Getenv("DB_PORT"))
 
 	var err error
-	DB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	DB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.CustomGormLogger(),
+	})
 	if err != nil {
 		logrus.Fatal(err.Error())
 	}
