@@ -1,4 +1,4 @@
-package tests
+package controllers
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gBalancer/controllers"
+	"gBalancer/logger"
 	"gBalancer/models"
 
 	"github.com/stretchr/testify/assert"
@@ -15,18 +15,26 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupDatabase() *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+func setupDatabase() (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: logger.CustomGormLogger(),
+	})
+
 	if err != nil {
 		panic("failed to connect database")
 	}
 	db.AutoMigrate(&models.RateLimits{})
-	return db
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 func TestCreateClient(t *testing.T) {
-	db := setupDatabase()
-	handler := controllers.ClientHandler(db)
+	db, err := setupDatabase()
+	assert.NoError(t, err)
+
+	handler := ClientHandler(db)
 
 	client := models.RateLimits{ClientID: "test-client"}
 	body, _ := json.Marshal(client)
@@ -46,8 +54,10 @@ func TestCreateClient(t *testing.T) {
 }
 
 func TestGetClient(t *testing.T) {
-	db := setupDatabase()
-	handler := controllers.ClientHandler(db)
+	db, err := setupDatabase()
+	assert.NoError(t, err)
+
+	handler := ClientHandler(db)
 
 	client := models.RateLimits{ClientID: "test-client"}
 	db.Create(&client)
@@ -67,8 +77,10 @@ func TestGetClient(t *testing.T) {
 }
 
 func TestUpdateClient(t *testing.T) {
-	db := setupDatabase()
-	handler := controllers.ClientHandler(db)
+	db, err := setupDatabase()
+	assert.NoError(t, err)
+
+	handler := ClientHandler(db)
 
 	client := models.RateLimits{ClientID: "test-client"}
 	db.Create(&client)
@@ -87,8 +99,10 @@ func TestUpdateClient(t *testing.T) {
 }
 
 func TestDeleteClient(t *testing.T) {
-	db := setupDatabase()
-	handler := controllers.ClientHandler(db)
+	db, err := setupDatabase()
+	assert.NoError(t, err)
+
+	handler := ClientHandler(db)
 
 	client := models.RateLimits{ClientID: "test-client"}
 	db.Create(&client)
