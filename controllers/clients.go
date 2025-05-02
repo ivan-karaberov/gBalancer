@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"gBalancer/errors"
 	"gBalancer/models"
 	"net/http"
 	"strings"
@@ -23,7 +24,8 @@ func ClientHandler(db *gorm.DB) http.HandlerFunc {
 		case http.MethodDelete:
 			DeleteClient(db, w, r)
 		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			errors.APIError(w, errors.ErrMethodNotAllowed)
+			return
 		}
 	}
 }
@@ -35,18 +37,18 @@ func CreateClient(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	client := new(models.RateLimits)
 	if err := json.NewDecoder(r.Body).Decode(client); err != nil {
 		logrus.Errorf("JSON Decode error > %s", err.Error())
-		http.Error(w, "Failed decode request body", http.StatusBadRequest)
+		errors.APIError(w, errors.ErrBadRequestBody)
 		return
 	}
 
 	if client.ClientID == "" {
-		http.Error(w, "Request missing data: ClientID is required", http.StatusBadRequest)
+		errors.APIError(w, errors.ErrBadRequestBody)
 		return
 	}
 
 	if err := models.CreateClient(db, client); err != nil {
 		logrus.Errorf("Failed to create client: %s", err.Error())
-		http.Error(w, "An unexpected error occurred while processing the request", http.StatusInternalServerError)
+		errors.APIError(w, errors.ErrInternalServer)
 		return
 	}
 
@@ -59,7 +61,7 @@ func GetClient(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	splitPath := strings.Split(r.URL.Path, "/")
 	if len(splitPath) < 3 {
-		http.Error(w, "Missing clientID", http.StatusNotFound)
+		errors.APIError(w, errors.ErrClientNotFound)
 		return
 	}
 
@@ -67,7 +69,7 @@ func GetClient(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	client, err := models.GetClient(db, clientID)
 	if err != nil {
 		logrus.Errorf("Error retrieving client > %s", err.Error())
-		http.Error(w, "User not found", http.StatusNotFound)
+		errors.APIError(w, errors.ErrClientNotFound)
 		return
 	}
 
@@ -81,19 +83,19 @@ func UpdateClient(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	updClient := new(models.RateLimits)
 	if err := json.NewDecoder(r.Body).Decode(updClient); err != nil {
 		logrus.Errorf("JSON Decode error > %s", err.Error())
-		http.Error(w, "Failed decode request body", http.StatusBadRequest)
+		errors.APIError(w, errors.ErrBadRequestBody)
 		return
 	}
 
 	if updClient.ClientID == "" {
-		http.Error(w, "Request missing data: ClientID is required", http.StatusBadRequest)
+		errors.APIError(w, errors.ErrClientNotFound)
 		return
 	}
 
 	err := models.UpdateClient(db, updClient)
 	if err != nil {
-		logrus.Errorf("Failed Retrieving client > %s", err.Error())
-		http.Error(w, "Failed Retrieving client", http.StatusInternalServerError)
+		logrus.Errorf("Failed update client > %s", err.Error())
+		errors.APIError(w, errors.ErrClientNotUpdated)
 		return
 	}
 
@@ -105,14 +107,14 @@ func DeleteClient(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	splitPath := strings.Split(r.URL.Path, "/")
 	if len(splitPath) < 3 {
-		http.Error(w, "Missing clientID", http.StatusNotFound)
+		errors.APIError(w, errors.ErrClientNotFound)
 		return
 	}
 
 	clientID := splitPath[2]
 	err := models.DeleteClient(db, clientID)
 	if err != nil {
-		http.Error(w, "Failed delete client", http.StatusInternalServerError)
+		errors.APIError(w, errors.ErrClientNotDeleted)
 		return
 	}
 

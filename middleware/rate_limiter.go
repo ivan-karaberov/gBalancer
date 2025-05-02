@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"gBalancer/errors"
 	"gBalancer/ratelimiter"
 	"net"
 	"net/http"
@@ -15,12 +16,12 @@ func RateLimitMiddleware(manager *ratelimiter.TokenBucketManager) func(http.Hand
 
 			bucket, err := manager.GetBucket(clientIP, true)
 			if err != nil {
-				http.Error(w, "Client not found", http.StatusNotFound)
+				errors.APIError(w, errors.ErrClientNotFound)
 				return
 			}
 
 			if !bucket.Allow() {
-				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+				errors.APIError(w, errors.ErrRateLimitExceeded)
 				return
 			}
 

@@ -3,6 +3,7 @@ package balancer
 import (
 	"context"
 	"fmt"
+	"gBalancer/errors"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -29,7 +30,7 @@ func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
 		logrus.Warningf("%s(%s) Max attempts reached, terminating", r.RemoteAddr, r.URL.Path)
-		http.Error(w, "Service not available", http.StatusServiceUnavailable)
+		errors.APIError(w, errors.ErrServiceUnavailabled)
 		return
 
 	}
@@ -38,7 +39,7 @@ func (bp *BackendPool) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		peer.ReverseProxy.ServeHTTP(w, r)
 		return
 	}
-	http.Error(w, "Service not available", http.StatusServiceUnavailable)
+	errors.APIError(w, errors.ErrServiceUnavailabled)
 }
 
 // Adds a new backend server to the specified BackendPool.
