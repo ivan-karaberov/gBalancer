@@ -23,7 +23,7 @@ func setupDatabase() (*gorm.DB, error) {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&models.RateLimits{})
+	err = db.AutoMigrate(&models.RateLimits{})
 	if err != nil {
 		return nil, err
 	}
